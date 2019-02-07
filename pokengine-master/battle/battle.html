@@ -1,0 +1,417 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Battle Engine</title>
+		<script src="scripts/functions/functions.js"></script>
+		<script src="scripts/functions/random.js"></script>
+		<script src="imports.js"></script>
+		<link href="Battle.css" rel="stylesheet" type="text/css">
+		<link href="http://fonts.googleapis.com/css?family=Open+Sans:300italic,600italic,300,600&subset=latin-ext,latin" rel="stylesheet" type="text/css">
+	</head>
+	<body>
+		<button id="connect">Connect</button>
+		<span>with the name</span>
+		<input id="name" type="text" value="Red">
+		<button id="randomise" class="small">⚄</button>
+		<span>or initiate an</span>
+		<button id="local">offline battle</button>
+		<br>
+		<div id="settings" class="popup hidden">
+			<table>
+				<tr>
+					<td>type</td>
+					<td><div class="select"><select id="style">
+						<option value="normal">normal</option>
+						<option value="double">double</option>
+						<option value="sky">sky</option>
+					</select></div></td>
+				</tr>
+				<tr class="hidden-">
+					<td>inverse</td>
+					<td><label><input id="inverse" type="checkbox"></td>
+				</tr>
+				<tr class="hidden-">
+					<td>weather</td>
+					<td><div class="select"><select id="weather">
+						<option value="clear skies">clear skies</option>
+						<option value="intense sunlight">sun</option>
+						<option value="rain">rain</option>
+						<option value="hail">hail</option>
+						<option value="sandstorm">sandstorm</option>
+						<option value="fog">fog</option>
+						<option value="diamond dust">diamond dust</option>
+						<option value="shadowy aura">shadowy aura</option>
+					</select></div></td>
+				</tr>
+				<tr class="hidden-">
+					<td>scene</td>
+					<td><div class="select"><select id="scene">
+						<option value="Field Clearing">clearing</option>
+						<option value="Walls at Night">clearing at night</option>
+						<option value="Forest Trail">forest trail</option>
+					</select></div></td>
+				</tr>
+			</table>
+			<table>
+				<caption><span>Rules</span></caption>
+				<tr>
+					<td>levels</td>
+					<td><div class="select"><select id="rule-levels">
+						<option value="any" selected>any</option>
+						<option value="flatten: 50">flatten to level 50</option>
+						<option value="flatten: 100">flatten to level 100</option>
+					</select></div></td>
+				</tr>
+				<tr>
+					<td>party</td>
+					<td><div class="select"><select id="rule-party">
+							<option value="up to: 6">up to 6</option>
+							<option value="up to: 3" selected>up to 3</option>
+							<option value="solo">only one</option>
+						</select></div>
+						<span>Pokémon</span>
+					</td>
+				</tr>
+				<tr>
+					<td>items</td>
+					<td><div class="select"><select id="rule-items">
+						<option value="allowed" selected>allowed</option>
+						<option value="disallowed">disallowed</option>
+					</select></div></td>
+				</tr>
+			</table>
+			<button>Confirm</button>
+		</div>
+		<span>Battle with the following Pokémon:</span>
+		<ul id="team" class="zebra"></ul>
+		<ul id="users"></ul>
+		<script>
+		"use strict";
+
+		let Battle = null;
+
+		let Interface = {
+			random : new srandom(172),
+			initialise : function () {
+				document.querySelector("#connect").addEventListener("mousedown", function (event) {
+					if (event.button !== 0)
+						return;
+					event.stopPropagation();
+					document.querySelector("#connect").innerHTML = "Connecting...";
+					document.querySelector("#connect").disabled = true;
+					document.querySelector("#name").disabled = true;
+					document.querySelector("#randomise").disabled = true;
+					Client.connect(document.querySelector("#name").value || "anonymous");
+				});
+
+				document.querySelector("#randomise").addEventListener("mousedown", function (event) {
+					if (event.button !== 0)
+						return;
+					event.stopPropagation();
+					if (!document.querySelector("#name").disabled) {
+						var name = "";
+						for (var i = 0; i < 10; ++ i)
+							name += "abcdefghijklmnopqrstuvwxyz".split("").choose();
+						document.querySelector("#name").value = name;
+						document.querySelector("#randomise").innerHTML = "⚀⚁⚂⚃⚄⚅".replace(document.querySelector("#randomise").innerHTML, "").split("").choose();
+						var mousedown = new Event("mousedown");
+						mousedown.button = 0;
+						document.querySelector("#connect").dispatchEvent(mousedown);
+					}
+				});
+
+				Interface.clearSettings = function () {
+					var classList = document.querySelector("#settings").classList;
+					if (!classList.contains("hidden")) {
+						classList.add("hidden");
+						var button = document.querySelector("#settings button");
+						if (button.hasOwnProperty("listener")) {
+							button.removeEventListener("mousedown", button.listener);
+							delete button.listener;
+						}
+					}
+				};
+
+				foreach(document.querySelectorAll("#settings select"), function (element) {
+					element.addEventListener("mousedown", function (event) {
+						event.stopPropagation();
+					});
+				});
+
+				Interface.popup = function (element, fn, below) {
+					var settings = document.querySelector("#settings"), buttonRect = element.getBoundingClientRect();
+					if (!settings.classList.contains("hidden")) {
+						if (settings.hasOwnProperty("overElement") && settings.overElement !== element) {
+							Interface.clearSettings();
+						} else {
+							var mousedown = new Event("mousedown");
+							mousedown.button = 0;
+							document.querySelector("#settings button").dispatchEvent(mousedown);
+							return;
+						}
+					}
+					settings.overElement = element;
+					settings.classList.remove("hidden");
+					var settingsRect = document.querySelector("#settings").getBoundingClientRect();
+					if (below) {
+						settings.classList.add("below");
+						settings.style.top = "calc(" + Math.round(buttonRect.bottom + window.scrollY) + "px + 20pt/* - 4pt*/)";
+					} else {
+						settings.style.top = "calc(" + Math.round(buttonRect.top - settingsRect.height + window.scrollY) + "px - 20pt/* + 4pt*/)";
+					}
+					settings.style.left = Math.round(buttonRect.left + buttonRect.width / 2 - settingsRect.width / 2 + window.scrollX) + "px";
+					var button = settings.querySelector("button");
+					button.addEventListener("mousedown", button.listener = function (event) {
+						event.stopPropagation();
+						button.removeEventListener("mousedown", button.listener);
+						delete button.listener;
+						settings.classList.add("hidden");
+						settings.classList.remove("below");
+						delete settings.overElement;
+						fn(event);
+					});
+				};
+
+				Interface.issue = function (element, message) {
+					var issue = document.createElement("div");
+					issue.classList.add("issue");
+					issue.innerHTML = message;
+					document.body.appendChild(issue);
+					var buttonRect = element.getBoundingClientRect();
+					issue.style.left = "calc(" + Math.round(buttonRect.right + window.scrollX) + "px + 4pt/* - 2pt*/)";
+					issue.style.top = (buttonRect.top + buttonRect.height / 2 - issue.getBoundingClientRect().height / 2 + window.scrollY) + "px";
+				};
+
+				Interface.clearIssues = function () {
+					foreach(document.querySelectorAll(".issue"), function (issue) {
+						issue.parentElement.removeChild(issue);
+					});
+				};
+
+				document.querySelector("#local").addEventListener("mousedown", function (event) {
+					if (event.button !== 0)
+						return;
+					Interface.clearIssues();
+					event.stopPropagation();
+					var afterwards = function (flags, stored) {
+						document.querySelector("#local").disabled = false;
+					};
+					Interface.popup(document.querySelector("#local"), function (event) {
+						document.querySelector("#local").disabled = true;
+						if (Battle === null) {
+							Battle = BattleContext(true);
+						}
+						Game.takePossessionOf(new trainer({
+							"name" : document.querySelector("#name").value,
+							"class" : "Pokémon Trainer",
+							"individual" : true,
+							"game" : "B2W2",
+							"party" : Interface.buildParty(),
+							"money" : 10000
+						}));
+						Game.player.bag.add("Key Stones => Mega Bracelet");
+						Game.player.bag.add("Balls => Master");
+						Game.player.bag.add("Berries => Sitrus");
+						Battle.beginWildBattle(Game.player, [new pokemon({
+							species : "Charizard (Nintendo)",
+							level : 45,
+							moves : [{ move : "Tackle" }]
+						}), new pokemon({
+							species : "Charizard (Nintendo)",
+							level : 45,
+							moves : [{ move : "Tackle" }]
+						})], Interface.buildSettings(), afterwards);
+						/*Battle.beginTrainerBattle(Game.player, new trainer({
+							"name" : "Roger",
+							"class" : "Ace Trainer",
+							"game" : "B2W2",
+							"pressure speech" : "You should never have gotten your hopes up!",
+							"defeat speech" : "So... this is what defeat tastes like...",
+							"party" : [
+								new pokemon({
+									species : "Charizard (Nintendo)",
+									level : 10,
+									moves : [{
+										move : "Tackle"
+									}],
+									shiny : true
+								}), new pokemon({
+									species : "Charizard (Nintendo)",
+									level : 5
+								})
+							]
+						}), Interface.buildSettings(), afterwards);*/
+					}, true);
+				});
+
+				Interface.connectionStatusChange = function () {
+					if (Client.connected) {
+						document.querySelector("#connect").innerHTML = "Connected";
+						document.querySelector("#connect").className = "active";
+					} else {
+						document.querySelector("#connect").innerHTML = "Connect";
+						document.querySelector("#connect").className = "";
+						document.querySelector("#connect").disabled = false;
+					}
+				};
+
+				document.querySelector("#name").addEventListener("mousedown", function (event) {
+					if (event.button !== 0)
+						return;
+					event.stopPropagation();
+				});
+
+				if (localStorage["name"])
+					document.querySelector("#name").value = localStorage["name"];
+
+				document.querySelector("#name").addEventListener("input", function (event) {
+					localStorage["name"] = document.querySelector("#name").value;
+				});
+
+				var team = document.querySelector("#team"), addMove = function (li, first) {
+					if (!first)
+						li.appendChild(document.createTextNode(", "));
+					var select = document.createElement("select"), option, moves = [];
+					forevery(Moves, function (move, name) {
+						if (move.classification.contains("_"))
+							return;
+						moves.push(name);
+					});
+					moves.sort();
+					foreach(moves, function (name) {
+						option = document.createElement("option");
+						option.innerHTML = name;
+						option.value = name;
+						select.appendChild(option);
+					});
+					li.appendChild(select);
+					return select;
+				}, disableMoves = function (group) {
+					var exclude = [];
+					foreach(group, function (select) {
+						exclude.push(select.selectedIndex);
+					});
+					foreach(group, function (select) {
+						foreach(select.options, function (option, i) {
+							select.options[i].disabled = (select.selectedIndex !== i && exclude.contains(i));
+						});
+					});
+				}, addPokemon = function () {
+					var li = document.createElement("li"), select = document.createElement("select"), option, speciesNames = [];
+					forevery(Pokedex, function (poke, name) {
+						if (name === "Missingno. (Nintendo)")
+							return;
+						speciesNames.push(name);
+					});
+					speciesNames.sort();
+					foreach(speciesNames, function (name) {
+						option = document.createElement("option");
+						option.innerHTML = name.replace(/ \(\w+\)$/, "");
+						option.value = name;
+						select.appendChild(option);
+					});
+					select.selectedIndex = Interface.random.int(0, select.childNodes.length - 1);
+					li.appendChild(select);
+					li.appendChild(document.createTextNode(", level "));
+					var level = document.createElement("input");
+					level.type = "text";
+					level.value = 50;
+					level.addEventListener("mousedown", function (event) {
+						event.stopPropagation();
+						event.preventDefault();
+						level.focus();
+						level.setSelectionRange(0, level.value.length);
+					});
+					level.addEventListener("input", function (event) {
+						level.value = level.value.replace(/[^0-9]/g, "");
+						if (level.value === "") {
+							level.value = 1;
+							level.setSelectionRange(0, 1);
+						} else
+							level.value = Math.clamp(1, parseInt(level.value), 100);
+					});
+					li.appendChild(level);
+					li.appendChild(document.createTextNode(", with moves:"));
+					li.appendChild(document.createElement("br"));
+					var group = [];
+					for (var i = 0; i < 3; ++ i)
+						group.push(addMove(li, i === 0));
+					foreach(group, function (moveSelect) {
+						moveSelect.addEventListener("change", function (event) {
+							disableMoves(group);
+						});
+						moveSelect.selectedIndex = Interface.random.chooseFromArray(range(0, moveSelect.options.length - 1).filter(function (index) { return !moveSelect.options[index].disabled; }));
+						disableMoves(group);
+					});
+					team.appendChild(li);
+				};
+				for (var i = 0; i < 3; ++ i)
+					addPokemon();
+
+				Interface.buildParty = function () {
+					var pokes = new party();
+					foreach(document.querySelector("#team").childNodes, function (li) {
+						var moves = [];
+						foreach(li.querySelectorAll("select:not(:first-of-type)"), function (select, i) {
+							var move = select.value;
+							moves.push({
+								move : move,
+								PP : Moves[move].PP,
+								PPUps : 0
+							});
+						});
+						pokes.add(new pokemon({
+							species : li.querySelector("select").value,
+							level : parseInt(li.querySelector("input").value),
+							moves : moves,
+							item : "Mega Stones => Pidgeotite",
+							shiny : true
+						}));
+					});
+					return pokes.store();
+				};
+
+				Interface.buildSettings = function () {
+					var settings = {
+						style : (["double", "sky"].contains(document.querySelector("#style").value) ? document.querySelector("#style").value : "normal"),
+						flags : document.querySelector("#inverse").checked ? ["inverse"] : [],
+						weather : (Weathers.contains(document.querySelector("#weather").value) ? document.querySelector("#weather").value : "clear skies"),
+						scene : (Scenes._(document.querySelector("#scene").value + "?") ? document.querySelector("#scene").value : "Field Clearing"),
+						rules : {
+							levels : document.querySelector("#rule-levels").value,
+							party : document.querySelector("#rule-party").value,
+							items : document.querySelector("#rule-items").value
+						},
+						tile : "grass"
+					};
+					return settings;
+				};
+
+				document.querySelector("#settings").addEventListener("mousedown", function (event) {
+					event.stopPropagation();
+				});
+
+				window.addEventListener("mousedown", function (event) {
+					if (event.button !== 0)
+						return;
+					var classList = document.querySelector("#settings").classList;
+					if (!classList.contains("hidden")) {
+						Interface.clearSettings();
+					}
+					Interface.clearIssues();
+				});
+
+				window.addEventListener("keydown", function (event) {
+					if (event.keyCode === 38 || event.keyCode === 40) {
+						event.preventDefault();
+					}
+				});
+
+				document.body.appendChild(Widgets.Party.interface.element);
+				document.body.appendChild(Widgets.Bag.interface.element);
+			}
+		};
+		</script>
+	</body>
+</html>
