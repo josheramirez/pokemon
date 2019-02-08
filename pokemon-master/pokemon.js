@@ -1,8 +1,11 @@
+/*VARIABLES DE COMBATE LISTA*/
 var userHP = 100;
 var opHP = 100;
 opAttacks = [flameThrower, dragonClaw, ember, growl];
 playerMove = 0;
-/* users moves */
+/*                          */
+
+/* PARTE LISTA */
 function waterCannon() {
   if(playerMove == 0 && userHP != 0) {
     var miss = Math.floor((Math.random() * 10) + 1); // miss rate
@@ -117,7 +120,7 @@ function tackle() {
   playerMove = 1;
 }
 }
-
+/*----------------------------------*/
 
 
 /* opponent's moves */
