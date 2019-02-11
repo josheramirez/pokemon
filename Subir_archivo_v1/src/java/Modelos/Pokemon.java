@@ -10,10 +10,7 @@ package Modelos;
  * @author Hospital
  */
 public class Pokemon {
-    public String nombre;
-    public int hp;
-    public int nivel;
-    public String imagen;
+    public String nombre; 
     public String ataque_1;
     public String ataque_2;
     public String ataque_3;

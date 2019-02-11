@@ -9,22 +9,11 @@ package Modelos;
  *
  * @author Hospital
  */
-public class Pokemon {
-    public String nombre;
-    public int hp;
-    public int nivel;
-    public String imagen;
+public class Pokedex {
     public String ataque_1;
     public String ataque_2;
     public String ataque_3;
     public String ataque_4;
     
-    public String[] getAtaques(){
-        String[] ataques=new String[4];
-        ataques[0]=ataque_1;
-        ataques[1]=ataque_2;
-        ataques[2]=ataque_3;
-        ataques[3]=ataque_4;
-        return ataques;
-    }
+    
 }
